@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tetris Game</title>
+  <style>
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+      background-color: #000;
+    }
+    canvas {
+      background-color: #111;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="tetris" width="320" height="640"></canvas>
+  <script>
+    const canvas = document.getElementById('tetris');
+    const ctx = canvas.getContext('2d');
+
+    const ROWS = 20;
+    const COLS = 10;
+    const BLOCK_SIZE = 32;
+
+    // Створюємо порожню матрицю для ігрового поля
+    function createMatrix(rows, cols) {
+      const matrix = [];
+      while (rows--) {
+        matrix.push(new Array(cols).fill(0));
+      }
+      return matrix;
+    }
+
+    // Матрична форма фігур
+    const TETROMINOS = {
+      I: [
+        [0, 0, 0, 0],
+        [1, 1, 1, 1],
+        [0, 0, 0, 0],
+        [0, 0, 0, 0]
+      ],
+      O: [
+        [2, 2],
+        [2, 2]
+      ],
+      T: [
+        [0, 3, 0],
+        [3, 3, 3],
+        [0, 0, 0]
+      ],
+      S: [
+        [0, 4, 4],
+        [4, 4, 0],
+        [0, 0, 0]
+      ],
+      Z: [
+        [5, 5, 0],
+        [0, 5, 5],
+        [0, 0, 0]
+      ],
+      J: [
+        [6, 0, 0],
+        [6, 6, 6],
+        [0, 0, 0]
+      ],
+      L: [
+        [0, 0, 7],
+        [7, 7, 7],
+        [0, 0, 0]
+      ]
+    };
+
+    // Функція для малювання блоку
+    function drawBlock(x, y, color) {
+      ctx.fillStyle = color;
+      ctx.fillRect(x * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+      ctx.strokeStyle = '#000';
+      ctx.strokeRect(x * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+    }
+
+    // Ігрове поле
+    const field = createMatrix(ROWS, COLS);
+
+    // Поточна фігура
+    let currentPiece = {
+      matrix: TETROMINOS['T'],  // Спочатку беремо фігуру "T"
+      position: { x: 3, y: 0 }
+    };
+
+    // Малювання всієї гри
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawMatrix(field, { x: 0, y: 0 });
+      drawMatrix(currentPiece.matrix, currentPiece.position);
+    }
+
+    // Малювання фігури
+    function drawMatrix(matrix, offset) {
+      matrix.forEach((row, y) => {
+        row.forEach((value, x) => {
+          if (value !== 0) {
+            drawBlock(x + offset.x, y + offset.y, getColor(value));
+          }
+        });
+      });
+    }
+
+    // Вибір кольору для блоку
+    function getColor(value) {
+      const colors = [
+        null,
+        'cyan',    // I
+        'yellow',  // O
+        'purple',  // T
+        'green',   // S
+        'red',     // Z
+        'blue',    // J
+        'orange'   // L
+      ];
+      return colors[value];
+    }
+
+    // Переміщення фігури вниз
+    function moveDown() {
+      currentPiece.position.y++;
+      if (collision()) {
+        currentPiece.position.y--;
+        merge();
+        resetPiece();
+        checkRows();
+      }
+    }
+
+    // Перевірка на зіткнення
+    function collision() {
+      const [m, o] = [currentPiece.matrix, currentPiece.position];
+      for (let y = 0; y < m.length; y++) {
+        for (let x = 0; x < m[y].length; x++) {
+          if (m[y][x] !== 0 && (field[y + o.y] && field[y + o.y][x + o.x]) !== 0) {
+            return true;
+          }
+        }
+      }
+      return false;
+    }
+
+    // Додавання фігури до ігрового поля
+    function merge() {
+      currentPiece.matrix.forEach((row, y) => {
+        row.forEach((value, x) => {
+          if (value !== 0) {
+            field[y + currentPiece.position.y][x + currentPiece.position.x] = value;
+          }
+        });
+      });
+    }
+
+    // Скидання фігури після приземлення
+    function resetPiece() {
+      const pieces = 'IJLOSTZ';
+      currentPiece.matrix = TETROMINOS[pieces[pieces.length * Math.random() | 0]];
+      currentPiece.position.y = 0;
+      currentPiece.position.x = (COLS / 2 | 0) - (currentPiece.matrix[0].length / 2 | 0);
+      if (collision()) {
+        field.forEach(row => row.fill(0));
+      }
+    }
+
+    // Перевірка на заповнені рядки
+    function checkRows() {
+      outer: for (let y = field.length - 1; y >= 0; y--) {
+        for (let x = 0; x < field[y].length; x++) {
+          if (field[y][x] === 0) {
+            continue outer;
+          }
+        }
+        field.splice(y, 1);
+        field.unshift(new Array(COLS).fill(0));
+      }
+    }
+
+    // Рух фігури вліво
+    function moveLeft() {
+      currentPiece.position.x--;
+      if (collision()) {
+        currentPiece.position.x++;
+      }
+    }
+
+    // Рух фігури вправо
+    function moveRight() {
+      currentPiece.position.x++;
+      if (collision()) {
+        currentPiece.position.x--;
+      }
+    }
+
+    // Поворот фігури
+    function rotate() {
+      const prevMatrix = currentPiece.matrix;
+      currentPiece.matrix = currentPiece.matrix[0].map((_, i) =>
+        currentPiece.matrix.map(row => row[i]).reverse()
+      );
+      if (collision()) {
+        currentPiece.matrix = prevMatrix;
+      }
+    }
+
+    // Логіка гри
+    let dropCounter = 0;
+    let dropInterval = 1000;
+    let lastTime = 0;
+
+    function update(time = 0) {
+      const deltaTime = time - lastTime;
+      lastTime = time;
+
+      dropCounter += deltaTime;
+      if (dropCounter > dropInterval) {
+        moveDown();
+        dropCounter = 0;
+      }
+
+      draw();
+      requestAnimationFrame(update);
+    }
+
+    // Обробка клавіш
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'ArrowLeft') {
+        moveLeft();
+      } else if (event.key === 'ArrowRight') {
+        moveRight();
+      } else if (event.key === 'ArrowDown') {
+        moveDown();
+      } else if (event.key === 'ArrowUp') {
+        rotate();
+      }
+    });
+
+    resetPiece();
+    update();
+  </script>
+</body>
+</html>
